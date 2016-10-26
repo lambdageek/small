@@ -4,3 +4,5 @@ module Language.Small (module Language.Small.Expr
 import Unbound.Generics.LocallyNameless
 
 import Language.Small.Expr
+
+import Data.Functor.TypeCheck
