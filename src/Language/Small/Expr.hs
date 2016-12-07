@@ -23,11 +23,20 @@ data ExprPath = ExprPath { exprPathMod :: ModulePath
 
 type TyVar = Name Type
 
+data UnifVar = Name (UnifVar)
+  deriving (Show, Typeable, Generic)
+
+instance Alpha UnifVar
+
 data Type =
   VarT TyVar
   | PathT TypePath
   | AppT Type Type
   | ForallT Kind (Bind TyVar Type)
+  | U UnifVar
+  deriving (Show, Typeable, Generic)
+
+newtype TypeScheme = TypeScheme (Bind [TyVar] Type) -- all of kind TypeK for now
   deriving (Show, Typeable, Generic)
 
 data Kind = TypeK
