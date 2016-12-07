@@ -28,6 +28,7 @@ library
   exposed-modules:     Language.Small
                      , Language.Small.Expr
                      , Data.Functor.TypeCheck
+                     , Control.Applicative.Unify
   default-extensions:  MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, DeriveGeneric
   -- other-modules:       
   -- other-extensions:    
