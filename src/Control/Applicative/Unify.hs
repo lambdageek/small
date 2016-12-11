@@ -1,49 +1,15 @@
 {-# language GADTs, TypeFamilies, RankNTypes, GeneralizedNewtypeDeriving, TypeOperators, DataKinds, PolyKinds #-}
 module Control.Applicative.Unify where
 
+import Control.Applicative.Free.Final
 import Control.Monad.Reader
-import Control.Monad.State
 import Control.Monad.Writer
 import Data.List (intercalate)
-import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Traversable (foldMapDefault)
 
--- data Ap f a where
---   Pure :: a -> Ap f a
---   Ap :: f a -> Ap f (a -> b) -> Ap f b
-
--- runAp :: Applicative g => Ap f a -> (forall x . f x -> g x) -> g a
--- runAp (Pure x) _ = pure x
--- runAp (Ap fa afab) phi = (\x f -> f x) <$> phi fa <*> runAp afab phi
-
--- liftAp :: f a -> Ap f a
--- liftAp fa = Ap fa (Pure id)
-
--- instance Functor (Ap f) where
---   fmap h (Pure x) = Pure (h x)
---   fmap h (Ap fa apfb) = Ap fa (fmap (h .) apfb)
-
--- instance Applicative (Ap f) where
---   pure = Pure
---   Pure f <*> p = fmap f p
---   Ap f p <*> q = Ap f ((\g -> flip g) <$> p <*> q)
-
-data Ap f a = Ap { runAp :: forall g . Applicative g => (forall x . f x -> g x) -> g a }
-  
-liftAp :: f a -> Ap f a
-liftAp fa = Ap (\phi -> phi fa)
-
-instance Functor (Ap f) where
-  fmap h (Ap kgc) = Ap (\phi -> fmap h (kgc phi))
-
-instance Applicative (Ap f) where
-  pure x = Ap (const (pure x))
-  (Ap kf) <*> (Ap kx) = Ap (\phi -> kf phi <*> kx phi)
-
-retractAp :: Applicative f => Ap f a -> f a
-retractAp (Ap ap) = ap id
-
+import Control.Applicative.Effect
+import Language.Pho
 
 -- Hindley-Milner Elaboration in the Applicative Style
 -- note that the constraint generation applicative functor is just the free applicative
@@ -169,52 +135,6 @@ generalize' t =
 freeUVars :: Ord u => Type v u -> [u]
 freeUVars = S.toList . foldMap (S.singleton) 
 
-data Term' x =
-  VarM x
-  | LamM (x -> Term' x)
-  | AppM (Term' x) (Term' x)
-  | LetM (Term' x) (x -> Term' x)
-
-type Term = forall t . Term' t
-
-showTerm' :: Term' String -> Reader [String] String
-showTerm' m =
-  case m of
-    VarM s -> return s
-    AppM m1 m2 -> do
-      s1 <- showTerm' m1
-      s2 <- showTerm' m2
-      return $ "app(" ++ s1 ++ "; " ++ s2 ++ ")"
-    LamM f -> do
-      (x:xs) <- ask
-      s <- local (const xs) $ showTerm' (f x)
-      return $ "lam(" ++ x ++ "." ++ s ++ ")"
-    LetM m1 f -> do
-      s1 <- showTerm' m1
-      (x:xs) <- ask
-      s2 <- local (const xs) $ showTerm' (f x)
-      return $ "let(" ++ s1 ++ "; " ++ x ++ "." ++ s2 ++ ")"
-
-showTerm :: Term -> String
-showTerm m = runReader (showTerm' m) (varNames ["x", "y", "z", "i", "j", "k", "a", "b", "c", "d", "e", "f"])
-
-varNames :: [String] -> [String]
-varNames ptn = ptn ++ go 1 ptn 
-  where
-    go :: Int -> [String] -> [String]
-    go n (x:xs) = (x ++ show n) : go n xs
-    go n [] = (go $! n + 1) ptn
-
-ex0 :: Term
-ex0 = LamM $ \x -> VarM x
-
-ex1 :: Term
-ex1 = LetM (LamM $ \x -> VarM x) $ \f -> LamM $ \x -> AppM (VarM f) (AppM (VarM f) (VarM x))
-
-ex2 :: Term
-ex2 = LamM $ \x -> LamM $ \y -> AppM (VarM y) (LamM $ \_z -> (VarM x))
-
-
 -- | An abbreviation "let x=α.C₁[α] in C₂{x}" means "∃α.C₁[α] ∧ C₂{α.C₁[α]/x}" where
 --   C{α.D[α]/x} is defined by cases on C as
 --     True {α.D[α]/x}       = True
@@ -252,26 +172,8 @@ newtype U = U String
 instance Show U where
   show (U s) = s
 
--- | An Applicative that encapsulates some monadic effect and doesn't
--- care about its argument.  (It's not 'Data.Functor.Const.Const'
--- because that would require @m r@ to be a Monoid which is weird).
--- We need this in order to apply a natural transformation over a
--- 'Constraint' without actually having to solve an 'Exist' constraint
--- (because the GADT wants a result term in that case)
-newtype Effect r m a = Effect { runEffect :: m r }
-
-effect :: m r -> Effect r m a
-effect = Effect
-
-instance Functor (Effect r m) where
-  fmap _ = effect . runEffect
-
-instance (Monad m, Monoid r) => Applicative (Effect r m) where
-  pure _ = effect (return mempty)
-  ef <*> ex = effect (mappend <$> runEffect ef <*> runEffect ex)
-
 collectSimpleConstraints' :: ConstraintGen u t a -> Effect () (Writer [SimpleConstraint t u]) a
-collectSimpleConstraints' (ConstraintGen cg) = runAp cg phi
+collectSimpleConstraints' (ConstraintGen cg) = runAp phi cg
   where
     phi :: Constraint (ConstraintGen u t) u t a -> Effect () (Writer [SimpleConstraint t u]) a
     phi c =

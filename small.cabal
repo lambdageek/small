@@ -29,7 +29,8 @@ library
                      --  Language.Small
                      --, Language.Small.Expr
                      --, Data.Functor.TypeCheck
-                  Control.Applicative.Unify
+                  Control.Applicative.Effect
+                , Control.Applicative.Unify
                 , Language.Pho
                 , Language.Deb
                 , Algo.DebPho
