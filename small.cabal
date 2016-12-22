@@ -33,7 +33,9 @@ library
                 , Control.Applicative.Unify
                 , Language.Pho
                 , Language.Deb
+                , Language.Monotype
                 , Algo.DebPho
+                , Algo.Elaborate
 
   default-extensions:  MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, DeriveGeneric
   -- other-modules:       
