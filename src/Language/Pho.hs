@@ -3,13 +3,13 @@ module Language.Pho where
 
 import Control.Monad.Reader
 
-data Term' v =
-  VarM v
-  | LamM (v -> Term' v)
-  | AppM (Term' v) (Term' v)
-  | LetM (Term' v) (v -> Term' v)
+data Term' f v =
+  VarM (f v)
+  | LamM (v -> Term' f v)
+  | AppM (Term' f v) (Term' f v)
+  | LetM (Term' f v) (v -> Term' f v)
 
-type Term = forall v . Term' v
+type Term f = forall v . Term' f v
 
 class Applicative m => MonadName m where
   scopeName :: (Name -> m a) -> m a
@@ -30,7 +30,7 @@ newtype Name = Name { nameString :: String }
 instance Show Name where
   show (Name n) = n
 
-showTerm' :: MonadName m => Term' Name -> m String
+showTerm' :: (Show (f Name), MonadName m) => Term' f Name -> m String
 showTerm' m =
   case m of
     VarM nm -> pure (show nm)
@@ -42,10 +42,10 @@ showTerm' m =
     showApp s1 s2 = "app(" ++ s1 ++ "; " ++ s2 ++ ")"
     showLet s (x,s') = "let(" ++ s ++ "; " ++ show x ++ "." ++ s' ++ ")"
 
-instance Show (Term' Name) where
+instance (Show (f Name)) => Show (Term' f Name) where
   show = showTerm
 
-showTerm :: Term' Name -> String
+showTerm :: (Show (f Name)) => Term' f Name -> String
 showTerm m = runReader (unNameSource (showTerm' m)) (map Name $ varNames ["x", "y", "z", "i", "j", "k", "a", "b", "c", "d", "e", "f"])
 
 varNames :: [String] -> [String]

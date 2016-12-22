@@ -3,6 +3,7 @@ module Algo.Elaborate where
 
 import Control.Monad.Reader
 import Control.Monad.Writer
+import Data.Functor.Identity
 import Data.List (intercalate)
 
 import Control.Applicative.Effect
@@ -37,22 +38,22 @@ letC x body = exist (\a -> x (injUVar a)) ~&&~ body x
 instC :: Schematic m a -> UTerm m -> m a
 instC x w = x w
 
-hasType' :: (ConstraintGenerating m, UVar m ~ u, UTerm m ~ Type v u) => Term' (Schematic m ()) -> UTerm m -> m ()
+hasType' :: (ConstraintGenerating m, UVar m ~ u, UTerm m ~ Type v u) => Term' Identity (Schematic m ()) -> UTerm m -> m ()
 hasType' m w =
   case m of
-    VarM x -> instC x w
+    VarM x -> instC (runIdentity x) w <&> const ()
     AppM m1 m2 ->
-      exist (\u -> hasType' m1 (ArrT (UVT u) w) ~&&~ hasType' m2 (UVT u)) <&> (\_ -> ())
+      exist (\u -> hasType' m1 (ArrT (UVT u) w) ~&&~ hasType' m2 (UVT u)) <&> const ()
     LamM f ->
       exist (\dom -> exist $ \cod ->
                 w ~?~ (ArrT (UVT dom) (UVT cod))
                 ~&&~
-                letC (~?~ UVT dom) (\x -> hasType' (f x) (UVT cod)))
+                letC (~?~ UVT dom) (\x -> hasType' (f x) (UVT cod) *> pure f))
       <&> const ()
     LetM m1 f ->
       letC (hasType' m1) (\x -> hasType' (f x) w) <&> const ()
       
-hasType :: Term -> Type v u -> ConstraintGen u (Type v) ()
+hasType :: Term Identity -> Type v u -> ConstraintGen u (Type v) ()
 hasType m w = hasType' m w
 
 newtype U = U String

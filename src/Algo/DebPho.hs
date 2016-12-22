@@ -2,27 +2,32 @@
 module Algo.DebPho where
 
 import Control.Monad.Reader
+import Data.Functor.Identity
 
 import Language.Deb
 import Language.Pho
 
-ex0 :: Term
-ex0 = LamM $ \x -> VarM x
+var :: v -> Term' Identity v
+var = VarM . Identity
 
-ex1 :: Term
-ex1 = LetM (LamM $ \x -> VarM x) $ \f -> LamM $ \x -> AppM (VarM f) (AppM (VarM f) (VarM x))
+ex0 :: Term Identity
+ex0 = LamM $ \x -> var x
 
-ex2 :: Term
-ex2 = LamM $ \x -> LamM $ \y -> AppM (VarM y) (LamM $ \_z -> (VarM x))
+ex1 :: Term Identity
+ex1 = LetM (LamM $ \x -> var x) $ \f -> LamM $ \x -> AppM (var f) (AppM (var f) (var x))
+
+ex2 :: Term Identity
+ex2 = LamM $ \x -> LamM $ \y -> AppM (var y) (LamM $ \_z -> (var x))
 
 
 scopeDeb :: MonadReader Int m => (Int -> m a) -> m a
 scopeDeb f = local (+1) (ask >>= f)
 
-debruijn' :: Term' Int -> Reader Int Expr
+debruijn' :: Term' Identity Int -> Reader Int Expr
 debruijn' m =
   case m of
-    VarM n -> do
+    VarM n_ -> do
+      let n = runIdentity n_
       k <- ask
       return $ VarE (k - n)
     AppM m1 m2 -> AppE <$> debruijn' m1 <*> debruijn' m2
@@ -30,7 +35,7 @@ debruijn' m =
       LamE <$> scopeDeb (debruijn' . f)
     LetM m f -> LetE <$> debruijn' m <*> scopeDeb (debruijn' . f)
 
-debruijn :: Term -> Expr
+debruijn :: Term Identity -> Expr
 debruijn m = runReader (debruijn' m) 0
       
 
@@ -40,13 +45,13 @@ hoark c = do
   vs <- ask
   return $ (\v -> runReader c (v:vs))
 
-phoas' :: Expr -> Reader [a] (Term' a)
+phoas' :: Expr -> Reader [a] (Term' Identity a)
 phoas' e =
   case e of
-    VarE n -> VarM <$> asks (!! n)
+    VarE n -> (VarM . Identity) <$> asks (!! n)
     AppE e1 e2 -> AppM <$> phoas' e1 <*> phoas' e2
     LamE e -> LamM <$> hoark (phoas' e)
     LetE e e' -> LetM <$> phoas' e <*> hoark (phoas' e')
     
-phoas :: Expr -> Term
+phoas :: Expr -> Term Identity
 phoas e = runReader (phoas' e) []
