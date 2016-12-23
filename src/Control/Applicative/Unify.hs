@@ -3,13 +3,14 @@ module Control.Applicative.Unify (
   -- * Constraint Generating Applicative functor
   ConstraintGenerating (..)
   , HasUVar (..)
+  , All (..)
+  , HindleyMilner (..)
   , (<&>)
   -- * Free Constraint Generating Applicative functor
   , Constraint (..)
   , CG
   , ConstraintGen (..)
-  -- * Simple constraints
-  , Schematic
+  -- * Simpleo constraints
   , SimpleConstraint (..)
   -- * re-export Ap from free
   , module Control.Applicative.Free.Final
@@ -22,31 +23,20 @@ import Control.Applicative.Free.Final (Ap(..), liftAp, runAp)
 -- over the two base operations of term (ie type) equality constraints t₁≐t₂ and
 -- fresh unification variable selection.
 
-data Constraint k v t a where
-  Unify :: t v -> t v -> Constraint k v t ()
-  Exist :: (v -> k a) -> Constraint k v t (t v, a)
+data Constraint k x v t y a where
+  Unify :: t v -> t v -> Constraint k x v t y ()
+  Exist :: (v -> k a) -> Constraint k x v t y (t v, a)
+  -- term variable definition
+  CDef :: t v -> (x -> k a) -> Constraint k x v t y (y -> a)
+  CLet :: (v -> k c1) -> (x -> k c2) -> Constraint k x v t y (All v (t v, All v c1), (y -> c2))
 
--- data Constraint' v t a where
---   TT :: Constraint' v t ()
---   And :: Constraint' v t a -> Constraint' v t b -> Constraint' v t (a,b)
---   Unify' :: t v -> t v -> Constraint' v t ()
---   Exist' :: (v -> Constraint' v t a) -> Constraint' v t (t v, a)
---   FMap :: (a -> b) -> Constraint' t v a -> Constraint' t v b
+-- | Type @All a b@ is the n-ary simultanteous binder for n variables of type @a@ scoping over object @b@.
+-- for example type schemes ∀α₁…αₙ.τ  are encoded as @All n f@ where @f [α₁,…,αₙ] = τ@
+data All a b = All Int ([a] -> b)
 
--- instance Functor (Constraint' v t) where
---   fmap f c =
---     case c of
---       FMap g c -> FMap (f . g) c
---       _ -> FMap f c
+type CG x v t y = Constraint (ConstraintGen x v t y) x v t y
 
--- instance Applicative (Constraint' v t) where
---   pure x = FMap (const x) TT
---   cf <*> cx = FMap (uncurry ($)) (And cf cx)
-      
-
-type CG v t = Constraint (ConstraintGen v t) v t
-
-newtype ConstraintGen v t a = ConstraintGen {unConstraintGen :: Ap (CG v t) a }
+newtype ConstraintGen x v t y a = ConstraintGen {unConstraintGen :: Ap (CG x v t y) a }
   deriving (Functor, Applicative)
 
 class Applicative u => ConstraintGenerating u where
@@ -57,33 +47,25 @@ class Applicative u => ConstraintGenerating u where
   exist :: (UVar u -> u a) -> u (UTerm u, a)
   (~?~) :: UTerm u -> UTerm u -> u ()
 
+class ConstraintGenerating u => HindleyMilner u where
+  type SchemeVar u :: *
+  type WitnessVar u :: *
+  cdef :: UTerm u -> (SchemeVar u -> u a) -> u (WitnessVar u -> a)
+  clet :: (UVar u -> u c1) -> (SchemeVar u -> u c2) -> u (All (UVar u) (UTerm u, All (UVar u) c1), (WitnessVar u -> c2))
+
 class HasUVar u t where
   injUVar :: u -> t
 
 (<&>) :: Functor f => f a -> (a -> b) -> f b
 (<&>) = flip (<$>)
 
-instance ConstraintGenerating (ConstraintGen v t) where
-  type UVar (ConstraintGen v t) = v
-  type UTerm (ConstraintGen v t) = t v
+instance ConstraintGenerating (ConstraintGen x v t y) where
+  type UVar (ConstraintGen x v t y) = v
+  type UTerm (ConstraintGen x v t y) = t v
   tt = pure ()
   c1 ~&&~ c2 = ConstraintGen ((,) <$> unConstraintGen c1 <*> unConstraintGen c2)
   t1 ~?~ t2 = ConstraintGen (liftAp (Unify t1 t2))
   exist f = ConstraintGen (liftAp (Exist f))
-
-
--- | A schematic constraint with a type hole.  Lambda-bound term
--- variables will be schemes that unify the expected type of the
--- variable with a single given type.  Let-bound term variables will
--- be schemes that capture the entire set of constraints generated for
--- the term being bound which will be copied anew into place wherever
--- the let-bound variable occurs.  This is what allows let-bound vars
--- to be instantiated at different types at each occurrence.
---
--- To explain Pottier's λβ.C meta-notation and the let-constraint "let
--- x=λβ.C₁ in C₂" and the application-constraint "x τ" we need to talk about
--- abstracting over terms, not just 
-type Schematic m a = UTerm m ->  m a --  Type v u -> ConstraintGen u (Type v) a
 
 -- simple constraints are True ([]), C₁∧C₂ (C1 ++ C2),
 -- ∃α.C (SExist (λa.C)), or t₁≐t₂ (SUnify t1 t2)

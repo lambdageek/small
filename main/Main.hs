@@ -1,3 +1,4 @@
+{-# language RankNTypes #-}
 module Main where
 
 -- import Language.Small
@@ -19,6 +20,6 @@ main :: IO ()
 main = do
   print (debruijn ex1)
   putStrLn (showTerm ex1)
-  let c :: ConstraintGen U (Type ()) ()
+  let c :: forall x y . ConstraintGen x U (Type ()) y ()
       c = hasType ex1 (injUVar $ U "x")
   putStrLn $ showConstraint c
