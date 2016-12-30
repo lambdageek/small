@@ -108,7 +108,14 @@ instance ConstraintGenerating (ConstraintGen x v t y) where
   type UTerm (ConstraintGen x v t y) = t v
   tt = pure ()
   c1 ~&&~ c2 = ConstraintGen ((,) <$> unConstraintGen c1 <*> unConstraintGen c2)
-  t1 ~?~ t2 = ConstraintGen (liftAp (Unify t1 t2))
-  exist f = ConstraintGen (liftAp (Exist f))
+  t1 ~?~ t2 = mkCG (Unify t1 t2)
+  exist f = mkCG (Exist f)
 
+mkCG :: CG x v t y a -> ConstraintGen x v t y a
+mkCG = ConstraintGen . liftAp
 
+instance HindleyMilner (ConstraintGen x v t y) where
+  type SchemeVar (ConstraintGen x v t y) = x
+  type WitnessVar (ConstraintGen x v t y) = y
+  cdef t f = mkCG (CDef t f)
+  clet c1 c2 = mkCG (CLet c1 c2)
