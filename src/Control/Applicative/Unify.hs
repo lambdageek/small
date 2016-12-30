@@ -10,8 +10,6 @@ module Control.Applicative.Unify (
   , Constraint (..)
   , CG
   , ConstraintGen (..)
-  -- * Simpleo constraints
-  , SimpleConstraint (..)
   -- * re-export Ap from free
   , module Control.Applicative.Free.Final
   ) where
@@ -67,11 +65,4 @@ instance ConstraintGenerating (ConstraintGen x v t y) where
   t1 ~?~ t2 = ConstraintGen (liftAp (Unify t1 t2))
   exist f = ConstraintGen (liftAp (Exist f))
 
--- simple constraints are True ([]), C₁∧C₂ (C1 ++ C2),
--- ∃α.C (SExist (λa.C)), or t₁≐t₂ (SUnify t1 t2)
-data SimpleConstraint t v = SUnify (t v) (t v) | SExist (v -> [SimpleConstraint t v])
-
--- the working state of the solver is atomic constraints
--- -- atomic constraints are v₀≐v₁≐…≐vₙ≐t (AUnify) or True ([]) or C₁∧C₂ (C1 ++ C2) or ∃α.C (AExist λa.C)
--- data AtomicConstraint t v = AUnify v [v] (t v) | AExist (v -> [AtomicConstraint t v])
 

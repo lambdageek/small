@@ -31,6 +31,8 @@ library
                      --, Data.Functor.TypeCheck
                   Control.Applicative.Effect
                 , Control.Applicative.Unify
+                , Data.Constraint.Simple
+                , Data.Constraint.Atomic
                 , Language.Pho
                 , Language.Deb
                 , Language.Monotype

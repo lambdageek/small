@@ -8,6 +8,7 @@ import Data.List (intercalate)
 
 import Control.Applicative.Effect
 import Control.Applicative.Unify
+import qualified Data.Constraint.Simple as Simple
 import Language.Monotype
 import Language.Pho
 
@@ -65,38 +66,38 @@ newtype U = U String
 instance Show U where
   show (U s) = s
 
-collectSimpleConstraints' :: HasUVar u (t u) => ConstraintGen (u -> [SimpleConstraint t u]) u t y a -> Effect () (Writer [SimpleConstraint t u]) a
+collectSimpleConstraints' :: HasUVar u (t u) => ConstraintGen (u -> [Simple.Constraint t u]) u t y a -> Effect () (Writer [Simple.Constraint t u]) a
 collectSimpleConstraints' (ConstraintGen cg) = runAp phi cg
   where
-    phi :: HasUVar u (t u) => Constraint (ConstraintGen (u -> [SimpleConstraint t u]) u t y) (u -> [SimpleConstraint t u]) u t y a -> Effect () (Writer [SimpleConstraint t u]) a
+    phi :: HasUVar u (t u) => Constraint (ConstraintGen (u -> [Simple.Constraint t u]) u t y) (u -> [Simple.Constraint t u]) u t y a -> Effect () (Writer [Simple.Constraint t u]) a
     phi c =
       case c of
-        Unify t1 t2 -> effect $ tell [SUnify t1 t2]
-        Exist f -> effect $ tell [SExist $ \v -> collectSimpleConstraints (f v)]
-        CDef t cbody -> let c = \v -> [SUnify t (injUVar v)]
-                    in effect $ tell ((SExist c) : collectSimpleConstraints (cbody c))
+        Unify t1 t2 -> effect $ tell [Simple.Unify t1 t2]
+        Exist f -> effect $ tell [Simple.Exist $ \v -> collectSimpleConstraints (f v)]
+        CDef t cbody -> let c = \v -> [Simple.Unify t (injUVar v)]
+                    in effect $ tell ((Simple.Exist c) : collectSimpleConstraints (cbody c))
         CLet cx cbody -> let c = collectSimpleConstraints . cx
-                         in effect $ tell ((SExist c) : collectSimpleConstraints (cbody c))
+                         in effect $ tell ((Simple.Exist c) : collectSimpleConstraints (cbody c))
 
-collectSimpleConstraints :: HasUVar u (t u) =>  ConstraintGen (u -> [SimpleConstraint t u]) u t y a -> [SimpleConstraint t u]
+collectSimpleConstraints :: HasUVar u (t u) =>  ConstraintGen (u -> [Simple.Constraint t u]) u t y a -> [Simple.Constraint t u]
 collectSimpleConstraints = snd . runWriter . runEffect . collectSimpleConstraints'
 
-showConstraint :: (Show (t U), HasUVar U (t U)) => ConstraintGen (U -> [SimpleConstraint t U]) U t y a -> String
+showConstraint :: (Show (t U), HasUVar U (t U)) => ConstraintGen (U -> [Simple.Constraint t U]) U t y a -> String
 showConstraint = showSimpleConstraints . collectSimpleConstraints
 
-showSimpleConstraints :: (Show (t U)) => [SimpleConstraint t U] -> String
+showSimpleConstraints :: (Show (t U)) => [Simple.Constraint t U] -> String
 showSimpleConstraints ss = runReader (showSimpleConstraints' ss) (map U $ varNames ["u", "v", "w"])
 
-showSimpleConstraints' :: (Show (t U)) => [SimpleConstraint t U] -> Reader [U] String
+showSimpleConstraints' :: (Show (t U)) => [Simple.Constraint t U] -> Reader [U] String
 showSimpleConstraints' ss = do
   strs <- mapM showSimpleConstraint ss
   return (intercalate " & " strs)
 
-showSimpleConstraint :: (Show (t U)) => SimpleConstraint t U -> Reader [U] String
+showSimpleConstraint :: (Show (t U)) => Simple.Constraint t U -> Reader [U] String
 showSimpleConstraint s =
   case s of
-    SUnify t1 t2 -> return (show t1 ++ " =?= " ++ show t2)
-    SExist f -> do
+    Simple.Unify t1 t2 -> return (show t1 ++ " =?= " ++ show t2)
+    Simple.Exist f -> do
       (u:us) <- ask
       c <- local (const us) $ showSimpleConstraints' (f u)
       return $ "∃(" ++ show u ++ "." ++ c ++ ")"
