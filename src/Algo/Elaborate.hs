@@ -43,6 +43,9 @@ instC x w = x w
 
 type Schematic m a = UTerm m -> m a
 
+(<&>) :: Functor f => f a -> (a -> b) -> f b
+(<&>) = flip (<$>)
+
 hasType' :: (ConstraintGenerating m, UVar m ~ u, UTerm m ~ Type v u) => Term' Identity (Schematic m ()) -> UTerm m -> m ()
 hasType' m w =
   case m of
