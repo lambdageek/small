@@ -20,6 +20,6 @@ main :: IO ()
 main = do
   print (debruijn ex1)
   putStrLn (showTerm ex1)
-  let c :: forall x y . ConstraintGen x U (Type ()) y ()
+  let c :: forall x y . ConstraintGen x U (Type () U) () y ()
       c = hasType ex1 (injUVar $ U "x")
   putStrLn $ showConstraint c

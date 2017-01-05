@@ -18,7 +18,7 @@ effect = Effect
 instance Functor (Effect r m) where
   fmap _ = effect . runEffect
 
-instance (Monad m, Monoid r) => Applicative (Effect r m) where
-  pure _ = effect (return mempty)
+instance (Applicative m, Monoid r) => Applicative (Effect r m) where
+  pure _ = effect (pure mempty)
   ef <*> ex = effect (mappend <$> runEffect ef <*> runEffect ex)
 
