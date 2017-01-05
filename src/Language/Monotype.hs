@@ -1,3 +1,4 @@
+{-# language RankNTypes #-}
 module Language.Monotype where
 
 import qualified Data.Set as S
@@ -44,3 +45,17 @@ instance Foldable (Type v) where
 freeUVars :: Ord u => Type v u -> [u]
 freeUVars = S.toList . foldMap (S.singleton) 
 
+-- phoas representation of types
+type Type' u = forall v . Type v u
+
+-- type with a one-hole context
+type Type1 u = forall v . v -> Type v u
+
+substTV :: Type' u -> Type1 u -> Type v u
+substTV t c = substTV' (c t)
+  where
+    substTV' :: Type (Type v u) u -> Type v u
+    substTV' BaseT = BaseT
+    substTV' (VarT t) = t
+    substTV' (UVT u) = UVT u
+    substTV' (ArrT t1 t2) = ArrT (substTV' t1) (substTV' t2)
