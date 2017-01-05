@@ -52,6 +52,6 @@ varNames :: [String] -> [String]
 varNames ptn = ptn ++ go 1 ptn 
   where
     go :: Int -> [String] -> [String]
-    go n (x:xs) = (x ++ show n) : go n xs
-    go n [] = (go $! n + 1) ptn
-
+    go n = let s = show n
+               k = go $! n + 1
+           in \xs -> map (++ s) xs ++ k xs
